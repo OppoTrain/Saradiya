@@ -97,29 +97,66 @@
     return replacement;
   };
 
-  const replaceText = (el) => {
-    if (el.nodeType === Node.TEXT_NODE) {
-      if (regex.test(el.textContent)) {
-        el.textContent = el.textContent.replace(regex, (matched) => {
-          const replacement = getReplacementText(matched);
-          if (
-            replacement !== matched &&
-            !replacedSet.has(matched.toLowerCase())
-          ) {
-            replacedWords.push({ original: matched, replacement: replacement });
-            replacedSet.add(matched.toLowerCase());
-          }
+  // Simple Bloom Filter Implementation
+class bloomFilter {
+  constructor(size, numHashFunctions) {
+    this.size = size;
+    this.numHashFunctions = numHashFunctions;
+    this.bitArray = new Array(size).fill(false);
+  }
 
-          createTooltip(el, matched);
-          return replacement;
-        });
-      }
-    } else {
-      for (let child of el.childNodes) {
-        replaceText(child);
+  // Hash function to create multiple hash values
+  hash(value, i) {
+    const hash1 = (value.charCodeAt(0) + i) % this.size;
+    const hash2 = (value.charCodeAt(0) * i) % this.size;
+    return (hash1 + hash2) % this.size;
+  }
+
+  // Add an item to the Bloom filter
+  add(value) {
+    for (let i = 0; i < this.numHashFunctions; i++) {
+      const index = this.hash(value, i);
+      this.bitArray[index] = true;
+    }
+  }
+
+  // Check if an item might be in the Bloom filter
+  contains(value) {
+    for (let i = 0; i < this.numHashFunctions; i++) {
+      const index = this.hash(value, i);
+      if (!this.bitArray[index]) {
+        return false;
       }
     }
-  };
+    return false;
+  }
+}
+
+const replaceText = (el) => {
+  const bloom= new bloomFilter(1024,0.1)
+  if (el.nodeType === Node.TEXT_NODE) {
+    el.textContent = el.textContent.replace(regex, (matched) => {
+      if (bloom.contains(matched.toLowerCase())) {
+        return matched;  
+      }
+      const replacement = getReplacementText(matched);
+      if (
+        replacement !== matched &&
+        !replacedSet.has(matched.toLowerCase())
+      ) {
+        replacedWords.push({ original: matched, replacement: replacement });
+        replacedSet.add(matched.toLowerCase());
+      }
+
+      createTooltip(el, matched);
+      return replacement;
+    });
+  } else {
+    for (let child of el.childNodes) {
+      replaceText(child, bloom);  
+    }
+  }
+};
 
   const anyChildOfBody = "/html/body//";
   // const doesNotContainAncestorWithRoleTextbox =
